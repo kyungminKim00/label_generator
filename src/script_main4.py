@@ -38,17 +38,18 @@ data["100_day_MA"] = data["Close"].rolling(window=100).mean()
 # 데이터프레임을 대시보드에서 사용할 수 있는 형식으로 변환합니다.
 df = data.reset_index()
 
+
 app = dash.Dash(__name__)
 
 app.layout = html.Div(
     [
-        html.Button("Step Forward", id="step-forward-button", n_clicks=0),
-        html.Button("Step Backward", id="step-backward-button", n_clicks=0),
-        html.Button("Buy", id="buy-button", n_clicks=0),
-        html.Button("Buy-Clear", id="buy-clear-button", n_clicks=0),
-        html.Button("Sell", id="sell-button", n_clicks=0),
-        html.Button("Sell-Clear", id="sell-clear-button", n_clicks=0),
-        html.Button("Save Actions", id="save-action-button", n_clicks=0),
+        html.Button("Step Forward", id="step-forward-button", n_clicks=0, style={'margin-right': '0px'}),
+        html.Button("Step Backward", id="step-backward-button", n_clicks=0, style={'margin-right': '10px'}),
+        html.Button("Buy", id="buy-button", n_clicks=0, style={'margin-right': '0px'}),
+        html.Button("Buy-Clear", id="buy-clear-button", n_clicks=0, style={'margin-right': '10px'}),
+        html.Button("Sell", id="sell-button", n_clicks=0, style={'margin-right': '0px'}),
+        html.Button("Sell-Clear", id="sell-clear-button", n_clicks=0, style={'margin-right': '10px'}),
+        html.Button("Save Actions", id="save-action-button", n_clicks=0, style={'margin-right': '10px'}),
         dcc.Graph(id="live-graph"),
         html.Div(id="hidden-div", style={"display": "none"}, children=["", 0]),
         html.Div(id="hidden-div2", style={"display": "none"}, children=["", 0]),
@@ -62,6 +63,7 @@ app.layout = html.Div(
         ),
     ]
 )
+
 
 
 def calculate_profit(profits):
@@ -215,24 +217,29 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
 def update_graph_live(n, actions):
     _, step = n
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
-
+    _data = df.iloc[:step]
+    index_data = _data[env_dict['index_name']]
+    MA_10_day = df["10_day_MA"][:step]
+    MA_50_day = df["50_day_MA"][:step]
+    MA_100_day = df["100_day_MA"][:step]
+    
     data = [
         go.Candlestick(
-            x=df[env_dict['index_name']][:step],
-            open=df["Open"][:step],
-            high=df["High"][:step],
-            low=df["Low"][:step],
-            close=df["Close"][:step],
+            x=index_data,
+            open=_data["Open"],
+            high=_data["High"],
+            low=_data["Low"],
+            close=_data["Close"],
         ),
         go.Scatter(
-            x=df[env_dict['index_name']][:step], y=df["10_day_MA"][:step], mode="lines", name="10일 이동평균"
+            x=index_data, y=MA_10_day, mode="lines", name="10일 이동평균"
         ),
         go.Scatter(
-            x=df[env_dict['index_name']][:step], y=df["50_day_MA"][:step], mode="lines", name="50일 이동평균"
+            x=index_data, y=MA_50_day, mode="lines", name="50일 이동평균"
         ),
         go.Scatter(
-            x=df[env_dict['index_name']][:step],
-            y=df["100_day_MA"][:step],
+            x=index_data,
+            y=MA_100_day,
             mode="lines",
             name="100일 이동평균",
         ),
@@ -258,7 +265,7 @@ def update_graph_live(n, actions):
                 "yref": "y",
                 "y0": line["level"],
                 "y1": line["level"],
-                "line": {"color": color, "width": 1, "dash": "dash"},
+                "line": {"color": color, "width": 2, "dash": "dash"},
             }
             v_line = {
                 "type": "line",
@@ -268,7 +275,7 @@ def update_graph_live(n, actions):
                 "yref": "paper",
                 "y0": 0,
                 "y1": 1,
-                "line": {"color": color, "width": 1, "dash": "dash"},
+                "line": {"color": color, "width": 2, "dash": "dash"},
             }
             shapes.extend([h_line, v_line])
 
@@ -279,3 +286,4 @@ def update_graph_live(n, actions):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+    

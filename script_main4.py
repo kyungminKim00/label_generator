@@ -37,7 +37,11 @@ app.layout = html.Div(
         html.Div(
             id="actions-div", style={"display": "none"}, children="[]"
         ),  # 초기 값을 '[]'로 설정합니다.
-        dcc.Textarea(id='action-history', value='Actions will be displayed here', style={'width': '100%', 'height': 200}),
+        dcc.Textarea(
+            id="action-history",
+            value="Actions will be displayed here",
+            style={"width": "100%", "height": 200},
+        ),
     ]
 )
 
@@ -45,19 +49,31 @@ app.layout = html.Div(
 def calculate_profit(profits):
     total_profit = 1  # 최종 수익률을 계산하기 위한 변수. 초기값은 1(즉, 100%)로 설정.
 
-    for i in range(0, len(profits), 2):  # profits 리스트를 두 개씩 건너뛰며 반복
+    n_items = len(profits)
+    if n_items % 2 != 0:  # 만약 profits의 길이가 홀수라면
+        profits = profits[:-1]  # profits의 마지막 요소를 제거
+        n_items -= 1
+
+    for i in range(0, n_items, 2):  # profits 리스트를 두 개씩 건너뛰며 반복
         action_1 = profits[i]
-        action_2 = profits[i+1]
+        action_2 = profits[i + 1]
 
-        # 매수와 매수 청산 또는 매도와 매도 청산의 조합을 확인하고 수익률을 계산
-        if (action_1["act"] == "buy" and action_2["act"] == "buy_clear") or (action_1["act"] == "sell" and action_2["act"] == "sell_clear"):
-            initial_price = action_1["level"]
-            final_price = action_2["level"]
+        initial_price = action_1["level"]
+        final_price = action_2["level"]
+
+        # 매수와 매수 청산의 조합을 확인하고 수익률을 계산
+        if action_1["act"] == "buy" and action_2["act"] == "buy_clear":
             profit_ratio = final_price / initial_price
+        # 매도와 매도 청산의 조합을 확인하고 수익률을 계산
+        elif action_1["act"] == "sell" and action_2["act"] == "sell_clear":
+            profit_ratio = initial_price / final_price
+        else:
+            continue
 
-            total_profit *= profit_ratio  # 현재까지의 총 수익률을 업데이트
+        total_profit *= profit_ratio  # 현재까지의 총 수익률을 업데이트
 
     return (total_profit - 1) * 100  # 백분율로 수익률 변환
+
 
 @app.callback(
     Output("action-history", "value"),
@@ -66,14 +82,16 @@ def calculate_profit(profits):
     ],
 )
 def update_textarea(actions):
-    profits=0
-    
+    profits = f"{str(0)} % \n"
+
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
-    if len(actions) > 0 and len(actions)%2==0:
-        profits = calculate_profit(actions)
+    if len(actions) > 1:
+        profits = f"{calculate_profit(actions):.3}% \n"  # 수익률을 계산합니다.
     actions = actions[::-1]
     
-    return str(profits) + '\n'.join(map(str, actions))  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
+    return "profits"+ str(profits) + "\n".join(
+        map(str, actions)
+    )  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
 
 
 @app.callback(

@@ -37,7 +37,11 @@ app.layout = html.Div(
         html.Div(
             id="actions-div", style={"display": "none"}, children="[]"
         ),  # 초기 값을 '[]'로 설정합니다.
-        dcc.Textarea(id='action-history', value='Actions will be displayed here', style={'width': '100%', 'height': 200}),
+        dcc.Textarea(
+            id="action-history",
+            value="Actions will be displayed here",
+            style={"width": "100%", "height": 200},
+        ),
     ]
 )
 
@@ -51,7 +55,7 @@ app.layout = html.Div(
 def update_textarea(actions):
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
     actions = actions[::-1]
-    return '\n'.join(map(str, actions))  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
+    return "\n".join(map(str, actions))  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
 
 
 @app.callback(

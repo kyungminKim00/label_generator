@@ -12,7 +12,7 @@
 		"--gpus",
 		"all",
 		"-v",
-		"${localEnv:DATAHOME}/label_generator:/workspaces/label_generator/src/local_data",
+		"${localEnv:DATAHOME}/label_generator:/workspaces/label_generator/local_data",
 		"--shm-size",
 		"10.24g"
 	],

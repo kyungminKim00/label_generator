@@ -10,7 +10,7 @@ import yfinance as yf
 from dash.dependencies import Input, Output, State
 
 # 모듈 정보
-with open("./config.json", "r", encoding="utf-8") as fp:
+with open("./src/config.json", "r", encoding="utf-8") as fp:
     env_dict = json.load(fp)
 
 # 주식의 심볼을 지정합니다.
@@ -131,7 +131,7 @@ def update_step(n_forward, n_backward, n_buy, n_buy_clear, n_sell, n_sell_clear,
     [State("actions-div", "children")],
 )
 def save_action(n_save_action, actions):
-    pd.read_json(actions).to_csv(f"{env_dict['base_dir']}/{env_dict['save_actions']}", index=False)
+    pd.read_json(actions).to_csv(f"{env_dict['assets']}/{env_dict['save_actions']}", index=False)
 
 @app.callback(
     Output("actions-div", "children"),

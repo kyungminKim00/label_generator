@@ -1,12 +1,13 @@
-import yfinance as yf
-import pandas as pd
+import json
+import pprint
+
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output, State
+import pandas as pd
 import plotly.graph_objs as go
-import json
-import pprint
+import yfinance as yf
+from dash.dependencies import Input, Output, State
 
 # 주식의 심볼을 지정합니다.
 symbol = "AAPL"
@@ -90,7 +91,7 @@ def update_textarea(actions):
     actions = actions[::-1]
 
     return (
-        "profits" + str(profits) + "\n".join(map(str, actions))
+        "profits: " + str(profits) + "\n".join(map(str, actions))
     )  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
 
 

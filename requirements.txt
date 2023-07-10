@@ -12,3 +12,7 @@ ta
 mplfinance
 yfinance
 black
+dash
+dash-core-components
+dash-html-components
+

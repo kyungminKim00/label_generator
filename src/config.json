@@ -1,4 +1,8 @@
 {
     "assets": "./assets",
-    "save_actions": "save_actions.csv"
+    "save_actions": "save_actions.csv",
+    "tickers": "AAPL",
+    "interval": "15m",
+    "period": "max",
+    "index_name": "Date"
 }

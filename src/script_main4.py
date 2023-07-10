@@ -12,12 +12,23 @@ from dash.dependencies import Input, Output, State
 # 모듈 정보
 with open("./src/config.json", "r", encoding="utf-8") as fp:
     env_dict = json.load(fp)
-
-# 주식의 심볼을 지정합니다.
-symbol = "AAPL"
+pprint.pprint(env_dict)
 
 # 주가 데이터를 가져옵니다.
-data = yf.download(symbol, period="1y")
+if env_dict["interval"] == "15m":
+    env_dict["period"] = '60d' # 60일 15min max period
+    f_strftime = "%Y-%m-%d %H:%M:%S"
+else:
+    f_strftime = "%Y-%m-%d"    
+data = yf.download(tickers=env_dict["tickers"], period=env_dict["period"], interval=env_dict["interval"])
+data.index.name = env_dict['index_name']
+
+
+
+
+start = str(data.index[0]).replace(':', '_').replace('-', '_').replace(' ', '_')
+end = str(data.index[-1]).replace(':', '_').replace('-', '_').replace(' ', '_')
+file_prefix = f"{env_dict['tickers']}_{env_dict['interval']}_{start}_{end}"
 
 # 이동평균을 계산합니다.
 data["10_day_MA"] = data["Close"].rolling(window=10).mean()
@@ -131,7 +142,7 @@ def update_step(n_forward, n_backward, n_buy, n_buy_clear, n_sell, n_sell_clear,
     [State("actions-div", "children")],
 )
 def save_action(n_save_action, actions):
-    pd.read_json(actions).to_csv(f"{env_dict['assets']}/{env_dict['save_actions']}", index=False)
+    pd.read_json(actions).to_csv(f"{env_dict['assets']}/{file_prefix}_{env_dict['save_actions']}", index=False)
 
 @app.callback(
     Output("actions-div", "children"),
@@ -153,7 +164,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "buy-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime("%Y-%m-%d"),
+            "date": df["Date"][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "buy",
         }  # date를 문자열로 변환합니다.
@@ -162,7 +173,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "buy-clear-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime("%Y-%m-%d"),
+            "date": df["Date"][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "buy_clear",
         }  # date를 문자열로 변환합니다.
@@ -171,7 +182,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "sell-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime("%Y-%m-%d"),
+            "date": df["Date"][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "sell",
         }  # date를 문자열로 변환합니다.
@@ -180,7 +191,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "sell-clear-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime("%Y-%m-%d"),
+            "date": df["Date"][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "sell_clear",
         }  # date를 문자열로 변환합니다.

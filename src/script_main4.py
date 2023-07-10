@@ -10,7 +10,7 @@ import yfinance as yf
 from dash.dependencies import Input, Output, State
 
 # 모듈 정보
-with open("./src/config.json", "r", encoding="utf-8") as fp:
+with open("./config.json", "r", encoding="utf-8") as fp:
     env_dict = json.load(fp)
 
 # 주식의 심볼을 지정합니다.

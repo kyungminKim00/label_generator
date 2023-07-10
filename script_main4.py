@@ -88,9 +88,9 @@ def update_textarea(actions):
     if len(actions) > 1:
         profits = f"{calculate_profit(actions):.3}% \n"  # 수익률을 계산합니다.
     actions = actions[::-1]
-    
-    return "profits"+ str(profits) + "\n".join(
-        map(str, actions)
+
+    return (
+        "profits" + str(profits) + "\n".join(map(str, actions))
     )  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
 
 

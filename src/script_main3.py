@@ -1,18 +1,34 @@
-import yfinance as yf
-import pandas as pd
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-from dash.dependencies import Input, Output, State
-import plotly.graph_objs as go
 import json
 import pprint
 
-# 주식의 심볼을 지정합니다.
-symbol = "AAPL"
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+import pandas as pd
+import plotly.graph_objs as go
+import yfinance as yf
+from dash.dependencies import Input, Output, State
+
+# 모듈 정보
+with open("./src/config.json", "r", encoding="utf-8") as fp:
+    env_dict = json.load(fp)
+pprint.pprint(env_dict)
 
 # 주가 데이터를 가져옵니다.
-data = yf.download(symbol, period="1y")
+if env_dict["interval"] == "15m":
+    env_dict["period"] = '60d' # 60일 15min max period
+    f_strftime = "%Y-%m-%d %H:%M:%S"
+else:
+    f_strftime = "%Y-%m-%d"    
+data = yf.download(tickers=env_dict["tickers"], period=env_dict["period"], interval=env_dict["interval"])
+data.index.name = env_dict['index_name']
+g_action_profits = 0.0
+
+
+
+start = str(data.index[0]).replace(':', '_').replace('-', '_').replace(' ', '_')
+end = str(data.index[-1]).replace(':', '_').replace('-', '_').replace(' ', '_')
+
 
 # 이동평균을 계산합니다.
 data["10_day_MA"] = data["Close"].rolling(window=10).mean()
@@ -32,8 +48,10 @@ app.layout = html.Div(
         html.Button("Buy-Clear", id="buy-clear-button", n_clicks=0),
         html.Button("Sell", id="sell-button", n_clicks=0),
         html.Button("Sell-Clear", id="sell-clear-button", n_clicks=0),
+        html.Button("Save Actions", id="save-action-button", n_clicks=0),
         dcc.Graph(id="live-graph"),
         html.Div(id="hidden-div", style={"display": "none"}, children=["", 0]),
+        html.Div(id="hidden-div2", style={"display": "none"}, children=["", 0]),
         html.Div(
             id="actions-div", style={"display": "none"}, children="[]"
         ),  # 초기 값을 '[]'로 설정합니다.
@@ -46,6 +64,35 @@ app.layout = html.Div(
 )
 
 
+def calculate_profit(profits):
+    total_profit = 1  # 최종 수익률을 계산하기 위한 변수. 초기값은 1(즉, 100%)로 설정.
+
+    n_items = len(profits)
+    if n_items % 2 != 0:  # 만약 profits의 길이가 홀수라면
+        profits = profits[:-1]  # profits의 마지막 요소를 제거
+        n_items -= 1
+
+    for i in range(0, n_items, 2):  # profits 리스트를 두 개씩 건너뛰며 반복
+        action_1 = profits[i]
+        action_2 = profits[i + 1]
+
+        initial_price = action_1["level"]
+        final_price = action_2["level"]
+
+        # 매수와 매수 청산의 조합을 확인하고 수익률을 계산
+        if action_1["act"] == "buy" and action_2["act"] == "buy_clear":
+            profit_ratio = final_price / initial_price
+        # 매도와 매도 청산의 조합을 확인하고 수익률을 계산
+        elif action_1["act"] == "sell" and action_2["act"] == "sell_clear":
+            profit_ratio = initial_price / final_price
+        else:
+            continue
+
+        total_profit *= profit_ratio  # 현재까지의 총 수익률을 업데이트
+
+    return (total_profit - 1) * 100  # 백분율로 수익률 변환
+
+
 @app.callback(
     Output("action-history", "value"),
     [
@@ -53,9 +100,17 @@ app.layout = html.Div(
     ],
 )
 def update_textarea(actions):
+    profits = f"{str(0)} % \n"
+
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
+    if len(actions) > 1:
+        g_action_profits = calculate_profit(actions)
+        profits = f"{g_action_profits:.3}% \n"  # 수익률을 계산합니다.
     actions = actions[::-1]
-    return "\n".join(map(str, actions))  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
+
+    return (
+        "profits: " + str(profits) + "\n".join(map(str, actions))
+    )  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
 
 
 @app.callback(
@@ -83,6 +138,20 @@ def update_step(n_forward, n_backward, n_buy, n_buy_clear, n_sell, n_sell_clear,
 
 
 @app.callback(
+    Output("hidden-div2", "children"),
+    [Input("save-action-button", "n_clicks")],
+    [State("actions-div", "children")],
+)
+def save_action(n_save_action, actions):
+    res = pd.read_json(actions)
+    if res.shape[0] > 0:
+        s_action_date = str(res.iloc[0][env_dict['index_name']])
+        e_action_date = str(res.iloc[-1][env_dict['index_name']])
+        file_prefix = f"{env_dict['tickers']}_{env_dict['interval']}_{s_action_date}_{e_action_date}"
+        
+        pd.read_json(actions).to_csv(f"{env_dict['assets']}/{file_prefix}_{g_action_profits:.3}_{env_dict['save_actions']}", index=False)
+
+@app.callback(
     Output("actions-div", "children"),
     [
         Input("buy-button", "n_clicks"),
@@ -102,7 +171,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "buy-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime("%Y-%m-%d"),
+            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "buy",
         }  # date를 문자열로 변환합니다.
@@ -111,7 +180,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "buy-clear-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime("%Y-%m-%d"),
+            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "buy_clear",
         }  # date를 문자열로 변환합니다.
@@ -120,7 +189,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "sell-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime("%Y-%m-%d"),
+            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "sell",
         }  # date를 문자열로 변환합니다.
@@ -129,7 +198,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "sell-clear-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime("%Y-%m-%d"),
+            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "sell_clear",
         }  # date를 문자열로 변환합니다.
@@ -149,20 +218,20 @@ def update_graph_live(n, actions):
 
     data = [
         go.Candlestick(
-            x=df["Date"][:step],
+            x=df[env_dict['index_name']][:step],
             open=df["Open"][:step],
             high=df["High"][:step],
             low=df["Low"][:step],
             close=df["Close"][:step],
         ),
         go.Scatter(
-            x=df["Date"][:step], y=df["10_day_MA"][:step], mode="lines", name="10일 이동평균"
+            x=df[env_dict['index_name']][:step], y=df["10_day_MA"][:step], mode="lines", name="10일 이동평균"
         ),
         go.Scatter(
-            x=df["Date"][:step], y=df["50_day_MA"][:step], mode="lines", name="50일 이동평균"
+            x=df[env_dict['index_name']][:step], y=df["50_day_MA"][:step], mode="lines", name="50일 이동평균"
         ),
         go.Scatter(
-            x=df["Date"][:step],
+            x=df[env_dict['index_name']][:step],
             y=df["100_day_MA"][:step],
             mode="lines",
             name="100일 이동평균",
@@ -194,8 +263,8 @@ def update_graph_live(n, actions):
             v_line = {
                 "type": "line",
                 "xref": "x",
-                "x0": line["date"],
-                "x1": line["date"],
+                "x0": line[env_dict['index_name']],
+                "x1": line[env_dict['index_name']],
                 "yref": "paper",
                 "y0": 0,
                 "y1": 1,

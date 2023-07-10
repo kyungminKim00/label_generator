@@ -22,13 +22,13 @@ else:
     f_strftime = "%Y-%m-%d"    
 data = yf.download(tickers=env_dict["tickers"], period=env_dict["period"], interval=env_dict["interval"])
 data.index.name = env_dict['index_name']
-
+g_action_profits = 0.0
 
 
 
 start = str(data.index[0]).replace(':', '_').replace('-', '_').replace(' ', '_')
 end = str(data.index[-1]).replace(':', '_').replace('-', '_').replace(' ', '_')
-file_prefix = f"{env_dict['tickers']}_{env_dict['interval']}_{start}_{end}"
+
 
 # 이동평균을 계산합니다.
 data["10_day_MA"] = data["Close"].rolling(window=10).mean()
@@ -104,7 +104,8 @@ def update_textarea(actions):
 
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
     if len(actions) > 1:
-        profits = f"{calculate_profit(actions):.3}% \n"  # 수익률을 계산합니다.
+        g_action_profits = calculate_profit(actions)
+        profits = f"{g_action_profits:.3}% \n"  # 수익률을 계산합니다.
     actions = actions[::-1]
 
     return (
@@ -142,7 +143,13 @@ def update_step(n_forward, n_backward, n_buy, n_buy_clear, n_sell, n_sell_clear,
     [State("actions-div", "children")],
 )
 def save_action(n_save_action, actions):
-    pd.read_json(actions).to_csv(f"{env_dict['assets']}/{file_prefix}_{env_dict['save_actions']}", index=False)
+    res = pd.read_json(actions)
+    if res.shape[0] > 0:
+        s_action_date = str(res.iloc[0][env_dict['index_name']])
+        e_action_date = str(res.iloc[-1][env_dict['index_name']])
+        file_prefix = f"{env_dict['tickers']}_{env_dict['interval']}_{s_action_date}_{e_action_date}"
+        
+        pd.read_json(actions).to_csv(f"{env_dict['assets']}/{file_prefix}_{g_action_profits:.3}_{env_dict['save_actions']}", index=False)
 
 @app.callback(
     Output("actions-div", "children"),
@@ -164,7 +171,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "buy-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime(f_strftime),
+            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "buy",
         }  # date를 문자열로 변환합니다.
@@ -173,7 +180,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "buy-clear-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime(f_strftime),
+            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "buy_clear",
         }  # date를 문자열로 변환합니다.
@@ -182,7 +189,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "sell-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime(f_strftime),
+            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "sell",
         }  # date를 문자열로 변환합니다.
@@ -191,7 +198,7 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "sell-clear-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            "date": df["Date"][step - 1].strftime(f_strftime),
+            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
             "level": line_level,
             "act": "sell_clear",
         }  # date를 문자열로 변환합니다.
@@ -211,20 +218,20 @@ def update_graph_live(n, actions):
 
     data = [
         go.Candlestick(
-            x=df["Date"][:step],
+            x=df[env_dict['index_name']][:step],
             open=df["Open"][:step],
             high=df["High"][:step],
             low=df["Low"][:step],
             close=df["Close"][:step],
         ),
         go.Scatter(
-            x=df["Date"][:step], y=df["10_day_MA"][:step], mode="lines", name="10일 이동평균"
+            x=df[env_dict['index_name']][:step], y=df["10_day_MA"][:step], mode="lines", name="10일 이동평균"
         ),
         go.Scatter(
-            x=df["Date"][:step], y=df["50_day_MA"][:step], mode="lines", name="50일 이동평균"
+            x=df[env_dict['index_name']][:step], y=df["50_day_MA"][:step], mode="lines", name="50일 이동평균"
         ),
         go.Scatter(
-            x=df["Date"][:step],
+            x=df[env_dict['index_name']][:step],
             y=df["100_day_MA"][:step],
             mode="lines",
             name="100일 이동평균",
@@ -256,8 +263,8 @@ def update_graph_live(n, actions):
             v_line = {
                 "type": "line",
                 "xref": "x",
-                "x0": line["date"],
-                "x1": line["date"],
+                "x0": line[env_dict['index_name']],
+                "x1": line[env_dict['index_name']],
                 "yref": "paper",
                 "y0": 0,
                 "y1": 1,

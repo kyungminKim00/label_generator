@@ -9,6 +9,10 @@ import plotly.graph_objs as go
 import yfinance as yf
 from dash.dependencies import Input, Output, State
 
+# 모듈 정보
+with open("./src/config.json", "r", encoding="utf-8") as fp:
+    env_dict = json.load(fp)
+
 # 주식의 심볼을 지정합니다.
 symbol = "AAPL"
 
@@ -33,8 +37,10 @@ app.layout = html.Div(
         html.Button("Buy-Clear", id="buy-clear-button", n_clicks=0),
         html.Button("Sell", id="sell-button", n_clicks=0),
         html.Button("Sell-Clear", id="sell-clear-button", n_clicks=0),
+        html.Button("Save Actions", id="save-action-button", n_clicks=0),
         dcc.Graph(id="live-graph"),
         html.Div(id="hidden-div", style={"display": "none"}, children=["", 0]),
+        html.Div(id="hidden-div2", style={"display": "none"}, children=["", 0]),
         html.Div(
             id="actions-div", style={"display": "none"}, children="[]"
         ),  # 초기 값을 '[]'로 설정합니다.
@@ -118,6 +124,14 @@ def update_step(n_forward, n_backward, n_buy, n_buy_clear, n_sell, n_sell_clear,
     else:
         return n
 
+
+@app.callback(
+    Output("hidden-div2", "children"),
+    [Input("save-action-button", "n_clicks")],
+    [State("actions-div", "children")],
+)
+def save_action(n_save_action, actions):
+    pd.read_json(actions).to_csv(f"{env_dict['base_dir']}/{env_dict['save_actions']}", index=False)
 
 @app.callback(
     Output("actions-div", "children"),

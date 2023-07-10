@@ -2,14 +2,10 @@
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.245.0/containers/docker-existing-dockerfile
 {
 	"name": "label_generator",
-
-
 	// Sets the run context to one level up instead of the .devcontainer folder.
 	"context": "..",
-
 	// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
 	"dockerFile": "../Dockerfile",
-		
 	// Enable gpu
 	// i.e. wsl -> c:\Ubuntu_share\dataset ubuntu-> /home/kmkim/dataset
 	"runArgs": [
@@ -19,30 +15,24 @@
 		"${localEnv:DATAHOME}/label_generator:/workspaces/label_generator/src/local_data",
 		"--shm-size",
 		"10.24g"
-		],
-	
+	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	//"forwardPorts": [8888, 8787, 8786],
 	// "forwardPorts": [6006],
-
 	// Uncomment the next line to run commands after the container is created - for example installing curl.
 	// "postCreateCommand": "git config --global --add safe.directory /workspaces/pytrade",
-
 	// Uncomment when using a ptrace-based debugger like C++, Go, and Rust
 	// "runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined" ],
-
 	// Uncomment to use the Docker CLI from inside the container. See https://aka.ms/vscode-remote/samples/docker-from-docker.
 	// mounts does not work
 	// "mounts": [ "source=${localEnv:DATAHOME}pytrade, target=/workspaces/pytrade/local_data, type=bind, consistency=cached"],
-
 	// Uncomment to connect as a non-root user if you've added one. See https://aka.ms/vscode-remote/containers/non-root.
 	// "remoteUser": "vscode"
-
-	
-	"remoteEnv": {"PYTHONPATH": "${containerEnv:PATH}:/workspaces/label_generator/src",
-		     "DATAHOME": "${localEnv:DATAHOME}"},
-
-	"settings": { 
+	"remoteEnv": {
+		"PYTHONPATH": "${containerEnv:PATH}:/workspaces/label_generator/src",
+		"DATAHOME": "${localEnv:DATAHOME}"
+	},
+	"settings": {
 		"python.linting.enabled": true,
 		"python.linting.pylintEnabled": true,
 		"python.formatting.blackPath": "/usr/local/bin/black",
@@ -71,24 +61,22 @@
 		],
 		"python.testing.autoTestDiscoverOnSaveEnabled": true,
 		"python.sortImports.args": [
-			"--profile", "black"
+			"--profile",
+			"black"
 		],
 		"python.languageServer": "Pylance",
-		
 		"[python]": {
 			"editor.formatOnSave": true,
 			"editor.codeActionsOnSave": {
 				"source.organizeImports": true
-				}
-			},
-			"editor.tabSize": 4,
-			"github.gitProtocol": "ssh",
-			"files.autoSave": "onFocusChange",
-			"python.analysis.inlayHints.functionReturnTypes": false,
-			"python.analysis.inlayHints.variableTypes": false
-        
+			}
+		},
+		"editor.tabSize": 4,
+		"github.gitProtocol": "ssh",
+		"files.autoSave": "onFocusChange",
+		"python.analysis.inlayHints.functionReturnTypes": false,
+		"python.analysis.inlayHints.variableTypes": false
 	},
-
 	"extensions": [
 		"donjayamanne.python-extension-pack",
 		"trixnz.go-to-method",
@@ -99,10 +87,8 @@
 		"GrapeCity.gc-excelviewer",
 		"tabnine.tabnine-vscode",
 		"formulahendry.code-runner",
-		// "tabnine.tabnine-vscode",
 		"formulahendry.code-runner",
 		"GitHub.copilot",
 		"shd101wyy.markdown-preview-enhanced"
 	]
-	
 }

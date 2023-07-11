@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.graph_objs as go
 import yfinance as yf
 from dash.dependencies import Input, Output, State
+from joblib import load, dump
 
 # 모듈 정보
 with open("./src/config.json", "r", encoding="utf-8") as fp:
@@ -16,18 +17,21 @@ pprint.pprint(env_dict)
 
 # 주가 데이터를 가져옵니다.
 if env_dict["interval"] == "15m":
-    env_dict["period"] = '60d' # 60일 15min max period
+    env_dict["period"] = "60d"  # 60일 15min max period
     f_strftime = "%Y-%m-%d %H:%M:%S"
 else:
-    f_strftime = "%Y-%m-%d"    
-data = yf.download(tickers=env_dict["tickers"], period=env_dict["period"], interval=env_dict["interval"])
-data.index.name = env_dict['index_name']
+    f_strftime = "%Y-%m-%d"
+data = yf.download(
+    tickers=env_dict["tickers"],
+    period=env_dict["period"],
+    interval=env_dict["interval"],
+)
+data.index.name = env_dict["index_name"]
 g_action_profits = 0.0
 
 
-
-start = str(data.index[0]).replace(':', '_').replace('-', '_').replace(' ', '_')
-end = str(data.index[-1]).replace(':', '_').replace('-', '_').replace(' ', '_')
+start = str(data.index[0]).replace(":", "_").replace("-", "_").replace(" ", "_")
+end = str(data.index[-1]).replace(":", "_").replace("-", "_").replace(" ", "_")
 
 
 # 이동평균을 계산합니다.
@@ -43,13 +47,40 @@ app = dash.Dash(__name__)
 
 app.layout = html.Div(
     [
-        html.Button("Step Forward", id="step-forward-button", n_clicks=0, style={'margin-right': '0px'}),
-        html.Button("Step Backward", id="step-backward-button", n_clicks=0, style={'margin-right': '10px'}),
-        html.Button("Buy", id="buy-button", n_clicks=0, style={'margin-right': '0px'}),
-        html.Button("Buy-Clear", id="buy-clear-button", n_clicks=0, style={'margin-right': '10px'}),
-        html.Button("Sell", id="sell-button", n_clicks=0, style={'margin-right': '0px'}),
-        html.Button("Sell-Clear", id="sell-clear-button", n_clicks=0, style={'margin-right': '10px'}),
-        html.Button("Save Actions", id="save-action-button", n_clicks=0, style={'margin-right': '10px'}),
+        html.Button(
+            "Step Forward",
+            id="step-forward-button",
+            n_clicks=0,
+            style={"margin-right": "0px"},
+        ),
+        html.Button(
+            "Step Backward",
+            id="step-backward-button",
+            n_clicks=0,
+            style={"margin-right": "10px"},
+        ),
+        html.Button("Buy", id="buy-button", n_clicks=0, style={"margin-right": "0px"}),
+        html.Button(
+            "Buy-Clear",
+            id="buy-clear-button",
+            n_clicks=0,
+            style={"margin-right": "10px"},
+        ),
+        html.Button(
+            "Sell", id="sell-button", n_clicks=0, style={"margin-right": "0px"}
+        ),
+        html.Button(
+            "Sell-Clear",
+            id="sell-clear-button",
+            n_clicks=0,
+            style={"margin-right": "10px"},
+        ),
+        html.Button(
+            "Save Actions",
+            id="save-action-button",
+            n_clicks=0,
+            style={"margin-right": "10px"},
+        ),
         dcc.Graph(id="live-graph"),
         html.Div(id="hidden-div", style={"display": "none"}, children=["", 0]),
         html.Div(id="hidden-div2", style={"display": "none"}, children=["", 0]),
@@ -63,7 +94,6 @@ app.layout = html.Div(
         ),
     ]
 )
-
 
 
 def calculate_profit(profits):
@@ -147,11 +177,16 @@ def update_step(n_forward, n_backward, n_buy, n_buy_clear, n_sell, n_sell_clear,
 def save_action(n_save_action, actions):
     res = pd.read_json(actions)
     if res.shape[0] > 0:
-        s_action_date = str(res.iloc[0][env_dict['index_name']])
-        e_action_date = str(res.iloc[-1][env_dict['index_name']])
+        s_action_date = str(res.iloc[0][env_dict["index_name"]])
+        e_action_date = str(res.iloc[-1][env_dict["index_name"]])
         file_prefix = f"{env_dict['tickers']}_{env_dict['interval']}_{s_action_date}_{e_action_date}"
-        
-        pd.read_json(actions).to_csv(f"{env_dict['assets']}/{file_prefix}_{g_action_profits:.3}_{env_dict['save_actions']}", index=False)
+
+        dump(
+            {"replay_actions": pd.read_json(actions), "replay_data": data},
+            f"{env_dict['assets']}/{file_prefix}_{g_action_profits:.3}_{env_dict['save_actions']}",
+        )
+    return None
+
 
 @app.callback(
     Output("actions-div", "children"),
@@ -173,7 +208,9 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "buy-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
+            env_dict["index_name"]: df[env_dict["index_name"]][step - 1].strftime(
+                f_strftime
+            ),
             "level": line_level,
             "act": "buy",
         }  # date를 문자열로 변환합니다.
@@ -182,7 +219,9 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "buy-clear-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
+            env_dict["index_name"]: df[env_dict["index_name"]][step - 1].strftime(
+                f_strftime
+            ),
             "level": line_level,
             "act": "buy_clear",
         }  # date를 문자열로 변환합니다.
@@ -191,7 +230,9 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "sell-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
+            env_dict["index_name"]: df[env_dict["index_name"]][step - 1].strftime(
+                f_strftime
+            ),
             "level": line_level,
             "act": "sell",
         }  # date를 문자열로 변환합니다.
@@ -200,7 +241,9 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     if ctx.triggered[0]["prop_id"].split(".")[0] == "sell-clear-button" and step > 0:
         line_level = df["Close"][step - 1]
         new_line = {
-            env_dict['index_name']: df[env_dict['index_name']][step - 1].strftime(f_strftime),
+            env_dict["index_name"]: df[env_dict["index_name"]][step - 1].strftime(
+                f_strftime
+            ),
             "level": line_level,
             "act": "sell_clear",
         }  # date를 문자열로 변환합니다.
@@ -218,11 +261,11 @@ def update_graph_live(n, actions):
     _, step = n
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
     _data = df.iloc[:step]
-    index_data = _data[env_dict['index_name']]
+    index_data = _data[env_dict["index_name"]]
     MA_10_day = df["10_day_MA"][:step]
     MA_50_day = df["50_day_MA"][:step]
     MA_100_day = df["100_day_MA"][:step]
-    
+
     data = [
         go.Candlestick(
             x=index_data,
@@ -231,12 +274,8 @@ def update_graph_live(n, actions):
             low=_data["Low"],
             close=_data["Close"],
         ),
-        go.Scatter(
-            x=index_data, y=MA_10_day, mode="lines", name="10일 이동평균"
-        ),
-        go.Scatter(
-            x=index_data, y=MA_50_day, mode="lines", name="50일 이동평균"
-        ),
+        go.Scatter(x=index_data, y=MA_10_day, mode="lines", name="10일 이동평균"),
+        go.Scatter(x=index_data, y=MA_50_day, mode="lines", name="50일 이동평균"),
         go.Scatter(
             x=index_data,
             y=MA_100_day,
@@ -270,8 +309,8 @@ def update_graph_live(n, actions):
             v_line = {
                 "type": "line",
                 "xref": "x",
-                "x0": line[env_dict['index_name']],
-                "x1": line[env_dict['index_name']],
+                "x0": line[env_dict["index_name"]],
+                "x1": line[env_dict["index_name"]],
                 "yref": "paper",
                 "y0": 0,
                 "y1": 1,
@@ -286,4 +325,3 @@ def update_graph_live(n, actions):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
-    

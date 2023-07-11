@@ -1,8 +1,9 @@
 {
     "assets": "./assets",
-    "save_actions": "save_actions.csv",
+    "save_actions": "replay_actions.csv",
     "tickers": "AAPL",
     "interval": "15m",
     "period": "max",
-    "index_name": "Date"
+    "index_name": "Date",
+    "replay_interval": 1
 }

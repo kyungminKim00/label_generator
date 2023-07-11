@@ -86,7 +86,6 @@ app.layout = html.Div(
 )
 
 
-# 계산 잘 못 된 듯 다시 고민해 보기
 def calculate_return_rate(n, current_data):
     if n > 0:
         open_buy, open_sell = [], []
@@ -112,11 +111,11 @@ def calculate_return_rate(n, current_data):
                     os_prc = open_sell.pop()
                     tot_return_rate += ((current_prc - os_prc) / os_prc) * -1 * 100
 
-            # Hold position
-            if len(open_buy) > 0:
+            # Hold position - 여기 수정 해야 할 거 같음
+            if len(open_buy) > 0 and (idx == current_data.index[-1]):
                 for idx, ob_prc in enumerate(open_buy):
                     tot_return_rate += ((current_prc - ob_prc) / ob_prc) * 100
-            if len(open_sell) > 0:
+            if len(open_sell) > 0 and (idx == current_data.index[-1]):
                 for idx, os_prc in enumerate(open_sell):
                     tot_return_rate += ((current_prc - os_prc) / os_prc) * -1 * 100
 

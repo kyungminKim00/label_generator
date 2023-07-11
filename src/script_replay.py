@@ -86,32 +86,29 @@ app.layout = html.Div(
 )
 
 
-@app.callback(
-    Output("return-rate", "children"), [Input("interval-component", "n_intervals")]
-)
-def update_return_rate(n):
-    # Get the last row of the dataframe
-    n = n % total_sample
-    current_data = df.iloc[:n]
-
+def calculate_return_rate(n, current_data):
     if n > 0:
         open_buy, open_sell = None, None
         tot_return_rate = 0
         for idx in list(current_data.index):
             current_df = current_data.loc[idx]
             current_prc = current_df["Close"]
-            # close_buy, close_sell = current_prc, current_prc
 
+            # Open position
             if current_df["act"] == "buy":  # 나중에 리스트 처리 해서 멀티 포지션 계산할 수 있음
                 open_buy = current_prc
             elif current_df["act"] == "sell":
                 open_sell = current_prc
 
+            # Clse position
             if current_df["act"] == "buy_clear":
+                tot_return_rate += ((current_prc - open_buy) / open_buy) * 100
                 open_buy = None
             elif current_df["act"] == "sell_clear":
+                tot_return_rate += ((current_prc - open_sell) / open_sell) * -1 * 100
                 open_sell = None
 
+            # Hold position
             if open_buy is not None:
                 tot_return_rate += ((current_prc - open_buy) / open_buy) * 100
             if open_sell is not None:
@@ -121,8 +118,18 @@ def update_return_rate(n):
         return_rate_str = f"수익률: {tot_return_rate:.3f}%"
     else:
         return_rate_str = f"수익률: {0:.3f}%"
-
     return return_rate_str
+
+
+@app.callback(
+    Output("return-rate", "children"), [Input("interval-component", "n_intervals")]
+)
+def update_return_rate(n):
+    # Get the last row of the dataframe
+    n = n % total_sample
+    current_data = df.iloc[:n]
+
+    return calculate_return_rate(n, current_data)
 
 
 @app.callback(

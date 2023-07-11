@@ -1,6 +1,6 @@
 {
     "assets": "./assets",
-    "save_actions": "replay_actions.csv",
+    "save_actions": "replay_actions.pkl",
     "tickers": "AAPL",
     "interval": "15m",
     "period": "max",

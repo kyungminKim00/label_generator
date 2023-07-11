@@ -27,7 +27,6 @@ data = yf.download(
     interval=env_dict["interval"],
 )
 data.index.name = env_dict["index_name"]
-g_action_profits = 0.0
 
 
 start = str(data.index[0]).replace(":", "_").replace("-", "_").replace(" ", "_")
@@ -47,6 +46,20 @@ app = dash.Dash(__name__)
 
 app.layout = html.Div(
     [
+        html.Div(
+            id="return-rate",
+            children="수익률: 0.000%",
+            style={
+                "font-size": "20px",
+                "font-weight": "bold",
+                "color": "red",
+                "margin-bottom": "10px",
+                "margin-left": "10px",
+                "margin-top": "10px",  # 위쪽 여백
+                "margin-right": "10px",  # 오른쪽 여백
+                "text-align": "center",
+            },
+        ),
         html.Button(
             "Step Forward",
             id="step-forward-button",
@@ -96,53 +109,67 @@ app.layout = html.Div(
 )
 
 
-def calculate_profit(profits):
-    total_profit = 1  # 최종 수익률을 계산하기 위한 변수. 초기값은 1(즉, 100%)로 설정.
+def calculate_return_rate(n, current_data):
+    if n > 0:
+        open_buy, open_sell = [], []
+        opening_buy_positions, opening_sell_positions = 0, 0
+        tot_return_rate = 0
 
-    n_items = len(profits)
-    if n_items % 2 != 0:  # 만약 profits의 길이가 홀수라면
-        profits = profits[:-1]  # profits의 마지막 요소를 제거
-        n_items -= 1
+        last_buy_clear = current_data[current_data["act"] == "buy_clear"].index[-1]
+        last_sell_clear = current_data[current_data["act"] == "sell_clear"].index[-1]
 
-    for i in range(0, n_items, 2):  # profits 리스트를 두 개씩 건너뛰며 반복
-        action_1 = profits[i]
-        action_2 = profits[i + 1]
-
-        initial_price = action_1["level"]
-        final_price = action_2["level"]
-
-        # 매수와 매수 청산의 조합을 확인하고 수익률을 계산
-        if action_1["act"] == "buy" and action_2["act"] == "buy_clear":
-            profit_ratio = final_price / initial_price
-        # 매도와 매도 청산의 조합을 확인하고 수익률을 계산
-        elif action_1["act"] == "sell" and action_2["act"] == "sell_clear":
-            profit_ratio = initial_price / final_price
+        if len(last_buy_clear) == 0:
+            opening_buy_positions = current_data[current_data["act"] == "buy"].shape[0]
         else:
-            continue
+            tmp = current_data.loc[last_buy_clear:]
+            opening_buy_positions = tmp[tmp["act"] == "buy"].shape[0]
 
-        total_profit *= profit_ratio  # 현재까지의 총 수익률을 업데이트
+        if len(last_sell_clear) == 0:
+            opening_sell_positions = current_data[current_data["act"] == "sell"].shape[
+                0
+            ]
+        else:
+            tmp = current_data.loc[last_sell_clear:]
+            opening_sell_positions = tmp[tmp["act"] == "sell"].shape[0]
 
-    return (total_profit - 1) * 100  # 백분율로 수익률 변환
+        for idx in list(current_data.index):
+            current_df = current_data.loc[idx]
+            current_prc = current_df["level"]
+
+            if current_df["act"] == "buy":
+                open_buy.append(current_prc)
+            elif current_df["act"] == "sell":
+                open_sell.append(current_prc)
+
+            if current_df["act"] == "buy_clear":
+                for _ in range(len(open_buy)):
+                    ob_prc = open_buy.pop()
+                    tot_return_rate += ((current_prc - ob_prc) / ob_prc) * 100
+            elif current_df["act"] == "sell_clear":
+                for _ in range(len(open_sell)):
+                    os_prc = open_sell.pop()
+                    tot_return_rate += ((current_prc - os_prc) / os_prc) * -1 * 100
+
+        # Format return rate as percentage
+        return_rate_str = f"수익률: {tot_return_rate:.3f}% (매수포지션:{opening_buy_positions}, 매도포지션:{opening_sell_positions})"
+    else:
+        return_rate_str = f"수익률: {0:.3f}%"
+    return return_rate_str
 
 
 @app.callback(
-    Output("action-history", "value"),
+    [Output("action-history", "value"), Output("return-rate", "children")],
     [
         Input("actions-div", "children"),
     ],
 )
 def update_textarea(actions):
-    profits = f"{str(0)} % \n"
+    raw_actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
+    actions = raw_actions[::-1]
 
-    actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
-    if len(actions) > 1:
-        g_action_profits = calculate_profit(actions)
-        profits = f"{g_action_profits:.3}% \n"  # 수익률을 계산합니다.
-    actions = actions[::-1]
-
-    return (
-        "profits: " + str(profits) + "\n".join(map(str, actions))
-    )  # 리스트의 각 요소를 문자열로 변환하고, 각 요소 사이에 줄바꿈을 추가합니다.
+    return "\n".join(map(str, actions)), calculate_return_rate(
+        len(raw_actions), pd.DataFrame.from_dict(raw_actions)
+    )
 
 
 @app.callback(

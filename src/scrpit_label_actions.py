@@ -115,12 +115,13 @@ def calculate_return_rate(n, current_data):
         opening_buy_positions, opening_sell_positions = 0, 0
         tot_return_rate = 0
 
-        last_buy_clear = current_data[current_data["act"] == "buy_clear"].index[-1]
-        last_sell_clear = current_data[current_data["act"] == "sell_clear"].index[-1]
+        last_buy_clear = current_data[current_data["act"] == "buy_clear"].index
+        last_sell_clear = current_data[current_data["act"] == "sell_clear"].index
 
         if len(last_buy_clear) == 0:
             opening_buy_positions = current_data[current_data["act"] == "buy"].shape[0]
         else:
+            last_buy_clear = last_buy_clear[-1]
             tmp = current_data.loc[last_buy_clear:]
             opening_buy_positions = tmp[tmp["act"] == "buy"].shape[0]
 
@@ -129,6 +130,7 @@ def calculate_return_rate(n, current_data):
                 0
             ]
         else:
+            last_sell_clear = last_sell_clear[-1]
             tmp = current_data.loc[last_sell_clear:]
             opening_sell_positions = tmp[tmp["act"] == "sell"].shape[0]
 

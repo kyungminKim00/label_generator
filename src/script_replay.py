@@ -86,36 +86,42 @@ app.layout = html.Div(
 )
 
 
+# 계산 잘 못 된 듯 다시 고민해 보기
 def calculate_return_rate(n, current_data):
     if n > 0:
-        open_buy, open_sell = None, None
+        open_buy, open_sell = [], []
         tot_return_rate = 0
+
         for idx in list(current_data.index):
             current_df = current_data.loc[idx]
             current_prc = current_df["Close"]
 
             # Open position
             if current_df["act"] == "buy":  # 나중에 리스트 처리 해서 멀티 포지션 계산할 수 있음
-                open_buy = current_prc
+                open_buy.append(current_prc)
             elif current_df["act"] == "sell":
-                open_sell = current_prc
+                open_sell.append(current_prc)
 
             # Clse position
             if current_df["act"] == "buy_clear":
-                tot_return_rate += ((current_prc - open_buy) / open_buy) * 100
-                open_buy = None
+                for _ in range(len(open_buy)):
+                    ob_prc = open_buy.pop()
+                    tot_return_rate += ((current_prc - ob_prc) / ob_prc) * 100
             elif current_df["act"] == "sell_clear":
-                tot_return_rate += ((current_prc - open_sell) / open_sell) * -1 * 100
-                open_sell = None
+                for _ in range(len(open_sell)):
+                    os_prc = open_sell.pop()
+                    tot_return_rate += ((current_prc - os_prc) / os_prc) * -1 * 100
 
             # Hold position
-            if open_buy is not None:
-                tot_return_rate += ((current_prc - open_buy) / open_buy) * 100
-            if open_sell is not None:
-                tot_return_rate += ((current_prc - open_sell) / open_sell) * -1 * 100
+            if len(open_buy) > 0:
+                for idx, ob_prc in enumerate(open_buy):
+                    tot_return_rate += ((current_prc - ob_prc) / ob_prc) * 100
+            if len(open_sell) > 0:
+                for idx, os_prc in enumerate(open_sell):
+                    tot_return_rate += ((current_prc - os_prc) / os_prc) * -1 * 100
 
         # Format return rate as percentage
-        return_rate_str = f"수익률: {tot_return_rate:.3f}%"
+        return_rate_str = f"수익률: {tot_return_rate:.3f}% (매수포지션:{len(open_buy)}, 매도포지션:{len(open_sell)})"
     else:
         return_rate_str = f"수익률: {0:.3f}%"
     return return_rate_str

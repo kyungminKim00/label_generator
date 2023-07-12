@@ -306,9 +306,6 @@ def update_graph_live(n, actions):
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
     _data = df.iloc[s_step:step]
     index_data = _data[env_dict["index_name"]]
-    MA_10_day = df["10_day_MA"][s_step:step]
-    MA_50_day = df["50_day_MA"][s_step:step]
-    MA_100_day = df["100_day_MA"][s_step:step]
 
     data = [
         go.Candlestick(
@@ -318,11 +315,11 @@ def update_graph_live(n, actions):
             low=_data["Low"],
             close=_data["Close"],
         ),
-        go.Scatter(x=index_data, y=MA_10_day, mode="lines", name="10일 이동평균"),
-        go.Scatter(x=index_data, y=MA_50_day, mode="lines", name="50일 이동평균"),
+        go.Scatter(x=index_data, y=_data["10_day_MA"], mode="lines", name="10일 이동평균"),
+        go.Scatter(x=index_data, y=_data["50_day_MA"], mode="lines", name="50일 이동평균"),
         go.Scatter(
             x=index_data,
-            y=MA_100_day,
+            y=_data["100_day_MA"],
             mode="lines",
             name="100일 이동평균",
         ),

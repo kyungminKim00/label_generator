@@ -187,15 +187,21 @@ def update_textarea(actions):
     [State("hidden-div", "children")],
 )
 def update_step(n_forward, n_backward, n_buy, n_buy_clear, n_sell, n_sell_clear, n):
+    if isinstance(n, list):
+        button_id, step = n
+    else:
+        step = n
+    step = step + env_dict["offset"] + env_dict["canves_candle_num"]
+
     ctx = dash.callback_context
     button_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-    if button_id == "step-forward-button" and n[1] < len(df):
-        return ["forward", n[1] + 1]
-    elif button_id == "step-backward-button" and n[1] > 0:
-        return ["backward", n[1] - 1]
+    if button_id == "step-forward-button" and step < len(df):
+        return ["forward", step + 1]
+    elif button_id == "step-backward-button" and step > 0:
+        return ["backward", step - 1]
     else:
-        return n
+        return step
 
 
 @app.callback(
@@ -230,6 +236,8 @@ def save_action(n_save_action, actions):
 def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     ctx = dash.callback_context
     button_id, step = n
+
+    step = step + env_dict["offset"] + env_dict["canves_candle_num"]
 
     if isinstance(actions, str):
         actions = json.loads(actions)
@@ -287,13 +295,20 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     [State("actions-div", "children")],
 )
 def update_graph_live(n, actions):
-    _, step = n
+    if isinstance(n, list):
+        button_id, step = n
+    else:
+        step = n
+
+    step = step + env_dict["offset"] + env_dict["canves_candle_num"]
+    s_step = step - env_dict["canves_candle_num"]
+
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
-    _data = df.iloc[:step]
+    _data = df.iloc[s_step:step]
     index_data = _data[env_dict["index_name"]]
-    MA_10_day = df["10_day_MA"][:step]
-    MA_50_day = df["50_day_MA"][:step]
-    MA_100_day = df["100_day_MA"][:step]
+    MA_10_day = df["10_day_MA"][s_step:step]
+    MA_50_day = df["50_day_MA"][s_step:step]
+    MA_100_day = df["100_day_MA"][s_step:step]
 
     data = [
         go.Candlestick(

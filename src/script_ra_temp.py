@@ -1,39 +1,25 @@
-import yfinance as yf
-import pandas as pd
+import pprint
+import json
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
-import pprint
-import json
-from joblib import load, dump
 import numpy as np
 
+from lib.utils import calculate_return_rate_rpy, replay_data_load
 
-# replay data load
-def replay_data_load(f_name, env_dict):
-    replay_dict = load(f_name)
-    replay_actions, replay_data = (
-        replay_dict["replay_actions"],
-        replay_dict["replay_data"],
-    )
-    replay_actions.set_index(env_dict["index_name"], inplace=True)
-
-    last_action_date = replay_actions.index[-1]
-    replay_data = replay_data.join(replay_actions)
-
-    return replay_data.loc[:last_action_date]
+with open("./src/config.json", "r", encoding="utf-8") as fp:
+    env_dict = json.load(fp)
+pprint.pprint(env_dict)
 
 
 replay_file_name = (
     "AAPL_15m_2023-04-13 10:30:00_2023-04-13 13:45:00_0.0_replay_actions.pkl"
 )
 
-with open("./src/config.json", "r", encoding="utf-8") as fp:
-    env_dict = json.load(fp)
-pprint.pprint(env_dict)
 
+print("1111111111111111111111111")
 
 replay_data = replay_data_load(f"./assets/{replay_file_name}", env_dict)
 
@@ -90,39 +76,12 @@ app.layout = html.Div(
     Output("return-rate", "children"), [Input("interval-component", "n_intervals")]
 )
 def update_return_rate(n):
-    # Get the last row of the dataframe
     n = n % total_sample
-    current_data = df.iloc[:n]
+    n = n + env_dict["offset"] + env_dict["canves_candle_num"]
+    s_n = n - env_dict["canves_candle_num"]
 
-    if n > 0:
-        open_buy, open_sell = None, None
-        tot_return_rate = 0
-        for idx in list(current_data.index):
-            current_df = current_data.loc[idx]
-            current_prc = current_df["Close"]
-            # close_buy, close_sell = current_prc, current_prc
-
-            if current_df["act"] == "buy":  # 나중에 리스트 처리 해서 멀티 포지션 계산할 수 있음
-                open_buy = current_prc
-            elif current_df["act"] == "sell":
-                open_sell = current_prc
-
-            if current_df["act"] == "buy_clear":
-                open_buy = None
-            elif current_df["act"] == "sell_clear":
-                open_sell = None
-
-            if open_buy is not None:
-                tot_return_rate += ((current_prc - open_buy) / open_buy) * 100
-            if open_sell is not None:
-                tot_return_rate += ((current_prc - open_sell) / open_sell) * -1 * 100
-
-        # Format return rate as percentage
-        return_rate_str = f"수익률: {tot_return_rate:.3f}%"
-    else:
-        return_rate_str = f"수익률: {0:.3f}%"
-
-    return return_rate_str
+    current_data = df.iloc[s_n:n]
+    return calculate_return_rate_rpy(n, current_data)
 
 
 @app.callback(
@@ -156,12 +115,14 @@ def pause_resume(pause_clicks, resume_clicks):
 def update_graph_live(n, y_value, x_value):
     # 캔들스틱 그래프와 이동평균선을 그립니다.
     n = n % total_sample
+    n = n + env_dict["offset"] + env_dict["canves_candle_num"]
+    s_n = n - env_dict["canves_candle_num"]
 
     prc_of_date = df[env_dict["index_name"]][:n]
-    open_prc = df["Open"][:n]
-    high_prc = df["High"][:n]
-    low_prc = df["Low"][:n]
-    close_prc = df["Close"][:n]
+    open_prc = df["Open"][s_n:n]
+    high_prc = df["High"][s_n:n]
+    low_prc = df["Low"][s_n:n]
+    close_prc = df["Close"][s_n:n]
     data = [
         go.Candlestick(
             x=prc_of_date,
@@ -170,10 +131,14 @@ def update_graph_live(n, y_value, x_value):
             low=low_prc,
             close=close_prc,
         ),
-        go.Scatter(x=prc_of_date, y=df["10_day_MA"][:n], mode="lines", name="10일 이동평균"),
-        go.Scatter(x=prc_of_date, y=df["50_day_MA"][:n], mode="lines", name="50일 이동평균"),
         go.Scatter(
-            x=prc_of_date, y=df["100_day_MA"][:n], mode="lines", name="100일 이동평균"
+            x=prc_of_date, y=df["10_day_MA"][s_n:n], mode="lines", name="10일 이동평균"
+        ),
+        go.Scatter(
+            x=prc_of_date, y=df["50_day_MA"][s_n:n], mode="lines", name="50일 이동평균"
+        ),
+        go.Scatter(
+            x=prc_of_date, y=df["100_day_MA"][s_n:n], mode="lines", name="100일 이동평균"
         ),
     ]
 

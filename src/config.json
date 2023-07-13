@@ -5,7 +5,7 @@
     "interval": "15m",
     "period": "max",
     "index_name": "Date",
-    "replay_interval": 1,
+    "replay_interval": 0.5,
     "offset": 100,
     "canves_candle_num": 120
 }

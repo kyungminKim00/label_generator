@@ -9,6 +9,7 @@ import plotly.graph_objs as go
 import yfinance as yf
 from dash.dependencies import Input, Output, State
 from joblib import load, dump
+from lib.utils import add_feature_movingmean, calculate_return_rate
 
 # 모듈 정보
 with open("./src/config.json", "r", encoding="utf-8") as fp:
@@ -27,20 +28,13 @@ data = yf.download(
     interval=env_dict["interval"],
 )
 data.index.name = env_dict["index_name"]
-
-
-start = str(data.index[0]).replace(":", "_").replace("-", "_").replace(" ", "_")
-end = str(data.index[-1]).replace(":", "_").replace("-", "_").replace(" ", "_")
-
+g_action_profits = 0.0
 
 # 이동평균을 계산합니다.
-data["10_day_MA"] = data["Close"].rolling(window=10).mean()
-data["50_day_MA"] = data["Close"].rolling(window=50).mean()
-data["100_day_MA"] = data["Close"].rolling(window=100).mean()
+data = add_feature_movingmean(data, ma=[10, 50, 100])
 
 # 데이터프레임을 대시보드에서 사용할 수 있는 형식으로 변환합니다.
 df = data.reset_index()
-
 
 app = dash.Dash(__name__)
 
@@ -95,7 +89,11 @@ app.layout = html.Div(
             style={"margin-right": "10px"},
         ),
         dcc.Graph(id="live-graph"),
-        html.Div(id="hidden-div", style={"display": "none"}, children=["", 0]),
+        html.Div(
+            id="hidden-div",
+            style={"display": "none"},
+            children=["", env_dict["offset"] + env_dict["canves_candle_num"]],
+        ),
         html.Div(id="hidden-div2", style={"display": "none"}, children=["", 0]),
         html.Div(
             id="actions-div", style={"display": "none"}, children="[]"
@@ -109,56 +107,6 @@ app.layout = html.Div(
 )
 
 
-def calculate_return_rate(n, current_data):
-    if n > 0:
-        open_buy, open_sell = [], []
-        opening_buy_positions, opening_sell_positions = 0, 0
-        tot_return_rate = 0
-
-        last_buy_clear = current_data[current_data["act"] == "buy_clear"].index
-        last_sell_clear = current_data[current_data["act"] == "sell_clear"].index
-
-        if len(last_buy_clear) == 0:
-            opening_buy_positions = current_data[current_data["act"] == "buy"].shape[0]
-        else:
-            last_buy_clear = last_buy_clear[-1]
-            tmp = current_data.loc[last_buy_clear:]
-            opening_buy_positions = tmp[tmp["act"] == "buy"].shape[0]
-
-        if len(last_sell_clear) == 0:
-            opening_sell_positions = current_data[current_data["act"] == "sell"].shape[
-                0
-            ]
-        else:
-            last_sell_clear = last_sell_clear[-1]
-            tmp = current_data.loc[last_sell_clear:]
-            opening_sell_positions = tmp[tmp["act"] == "sell"].shape[0]
-
-        for idx in list(current_data.index):
-            current_df = current_data.loc[idx]
-            current_prc = current_df["level"]
-
-            if current_df["act"] == "buy":
-                open_buy.append(current_prc)
-            elif current_df["act"] == "sell":
-                open_sell.append(current_prc)
-
-            if current_df["act"] == "buy_clear":
-                for _ in range(len(open_buy)):
-                    ob_prc = open_buy.pop()
-                    tot_return_rate += ((current_prc - ob_prc) / ob_prc) * 100
-            elif current_df["act"] == "sell_clear":
-                for _ in range(len(open_sell)):
-                    os_prc = open_sell.pop()
-                    tot_return_rate += ((current_prc - os_prc) / os_prc) * -1 * 100
-
-        # Format return rate as percentage
-        return_rate_str = f"수익률: {tot_return_rate:.3f}% (매수포지션:{opening_buy_positions}, 매도포지션:{opening_sell_positions})"
-    else:
-        return_rate_str = f"수익률: {0:.3f}%"
-    return return_rate_str
-
-
 @app.callback(
     [Output("action-history", "value"), Output("return-rate", "children")],
     [
@@ -166,12 +114,15 @@ def calculate_return_rate(n, current_data):
     ],
 )
 def update_textarea(actions):
+    global g_action_profits
     raw_actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
     actions = raw_actions[::-1]
 
-    return "\n".join(map(str, actions)), calculate_return_rate(
+    return_rate_string, g_action_profits = calculate_return_rate(
         len(raw_actions), pd.DataFrame.from_dict(raw_actions)
     )
+
+    return "\n".join(map(str, actions)), return_rate_string
 
 
 @app.callback(
@@ -187,21 +138,17 @@ def update_textarea(actions):
     [State("hidden-div", "children")],
 )
 def update_step(n_forward, n_backward, n_buy, n_buy_clear, n_sell, n_sell_clear, n):
-    if isinstance(n, list):
-        button_id, step = n
-    else:
-        step = n
-    step = step + env_dict["offset"] + env_dict["canves_candle_num"]
+    button_id, step = n
 
     ctx = dash.callback_context
     button_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
     if button_id == "step-forward-button" and step < len(df):
-        return ["forward", step + 1]
+        return ["forward", n[1] + 1]
     elif button_id == "step-backward-button" and step > 0:
-        return ["backward", step - 1]
+        return ["backward", n[1] - 1]
     else:
-        return step
+        return n
 
 
 @app.callback(
@@ -236,8 +183,6 @@ def save_action(n_save_action, actions):
 def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     ctx = dash.callback_context
     button_id, step = n
-
-    step = step + env_dict["offset"] + env_dict["canves_candle_num"]
 
     if isinstance(actions, str):
         actions = json.loads(actions)
@@ -295,30 +240,35 @@ def update_actions(n_buy, n_buy_clear, n_sell, n_sell_clear, n, actions):
     [State("actions-div", "children")],
 )
 def update_graph_live(n, actions):
-    if isinstance(n, list):
-        button_id, step = n
-    else:
-        step = n
-
-    step = step + env_dict["offset"] + env_dict["canves_candle_num"]
-    s_step = step - env_dict["canves_candle_num"]
+    button_id, step = n
 
     actions = json.loads(actions)  # actions를 JSON 문자열에서 Python 객체로 변환합니다.
-    _data = df.iloc[s_step:step]
+    _data = df.iloc[step - env_dict["canves_candle_num"] : step]
+
     index_data = _data[env_dict["index_name"]]
 
     data = [
         go.Candlestick(
-            x=index_data,
+            x=list(index_data.index),
             open=_data["Open"],
             high=_data["High"],
             low=_data["Low"],
             close=_data["Close"],
         ),
-        go.Scatter(x=index_data, y=_data["10_day_MA"], mode="lines", name="10일 이동평균"),
-        go.Scatter(x=index_data, y=_data["50_day_MA"], mode="lines", name="50일 이동평균"),
         go.Scatter(
-            x=index_data,
+            x=list(index_data.index),
+            y=_data["10_day_MA"],
+            mode="lines",
+            name="10일 이동평균",
+        ),
+        go.Scatter(
+            x=list(index_data.index),
+            y=_data["50_day_MA"],
+            mode="lines",
+            name="50일 이동평균",
+        ),
+        go.Scatter(
+            x=list(index_data.index),
             y=_data["100_day_MA"],
             mode="lines",
             name="100일 이동평균",
@@ -359,7 +309,10 @@ def update_graph_live(n, actions):
             }
             shapes.extend([h_line, v_line])
 
-    layout = go.Layout(xaxis={"rangeslider": {"visible": False}}, shapes=shapes)
+    layout = go.Layout(
+        xaxis={"rangeslider": {"visible": False}},
+        shapes=shapes,
+    )
 
     return {"data": data, "layout": layout}
 

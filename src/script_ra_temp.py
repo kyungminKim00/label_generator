@@ -77,10 +77,7 @@ app.layout = html.Div(
 )
 def update_return_rate(n):
     n = n % total_sample
-    n = n + env_dict["offset"] + env_dict["canves_candle_num"]
-    s_n = n - env_dict["canves_candle_num"]
-
-    current_data = df.iloc[s_n:n]
+    current_data = df.iloc[:n]
     return calculate_return_rate_rpy(n, current_data)
 
 
@@ -115,14 +112,12 @@ def pause_resume(pause_clicks, resume_clicks):
 def update_graph_live(n, y_value, x_value):
     # 캔들스틱 그래프와 이동평균선을 그립니다.
     n = n % total_sample
-    n = n + env_dict["offset"] + env_dict["canves_candle_num"]
-    s_n = n - env_dict["canves_candle_num"]
 
     prc_of_date = df[env_dict["index_name"]][:n]
-    open_prc = df["Open"][s_n:n]
-    high_prc = df["High"][s_n:n]
-    low_prc = df["Low"][s_n:n]
-    close_prc = df["Close"][s_n:n]
+    open_prc = df["Open"][:n]
+    high_prc = df["High"][:n]
+    low_prc = df["Low"][:n]
+    close_prc = df["Close"][:n]
     data = [
         go.Candlestick(
             x=prc_of_date,
@@ -131,14 +126,10 @@ def update_graph_live(n, y_value, x_value):
             low=low_prc,
             close=close_prc,
         ),
+        go.Scatter(x=prc_of_date, y=df["10_day_MA"][:n], mode="lines", name="10일 이동평균"),
+        go.Scatter(x=prc_of_date, y=df["50_day_MA"][:n], mode="lines", name="50일 이동평균"),
         go.Scatter(
-            x=prc_of_date, y=df["10_day_MA"][s_n:n], mode="lines", name="10일 이동평균"
-        ),
-        go.Scatter(
-            x=prc_of_date, y=df["50_day_MA"][s_n:n], mode="lines", name="50일 이동평균"
-        ),
-        go.Scatter(
-            x=prc_of_date, y=df["100_day_MA"][s_n:n], mode="lines", name="100일 이동평균"
+            x=prc_of_date, y=df["100_day_MA"][:n], mode="lines", name="100일 이동평균"
         ),
     ]
 

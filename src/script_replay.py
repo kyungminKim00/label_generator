@@ -9,25 +9,11 @@ import pprint
 import json
 from joblib import load, dump
 import numpy as np
-
-
-# replay data load
-def replay_data_load(f_name, env_dict):
-    replay_dict = load(f_name)
-    replay_actions, replay_data = (
-        replay_dict["replay_actions"],
-        replay_dict["replay_data"],
-    )
-    replay_actions.set_index(env_dict["index_name"], inplace=True)
-
-    last_action_date = replay_actions.index[-1]
-    replay_data = replay_data.join(replay_actions)
-
-    return replay_data.loc[:last_action_date]
+from lib.utils import replay_data_load, calculate_return_rate_rpy
 
 
 replay_file_name = (
-    "AAPL_15m_2023-04-13 10:30:00_2023-04-13 13:45:00_0.0_replay_actions.pkl"
+    "AAPL_15m_2023-04-27 13:00:00_2023-05-01 09:45:00_0.484_replay_actions.pkl"
 )
 
 with open("./src/config.json", "r", encoding="utf-8") as fp:
@@ -72,8 +58,6 @@ app.layout = html.Div(
         dcc.Dropdown(
             id="interval-dropdown",
             options=[
-                {"label": "0.1초", "value": 0.1},
-                {"label": "0.2초", "value": 0.2},
                 {"label": "0.5초", "value": 0.5},
                 {"label": "1초", "value": 1},
                 {"label": "2초", "value": 2},
@@ -86,55 +70,16 @@ app.layout = html.Div(
 )
 
 
-def calculate_return_rate(n, current_data):
-    if n > 0:
-        open_buy, open_sell = [], []
-        tot_return_rate = 0
-
-        for idx in list(current_data.index):
-            current_df = current_data.loc[idx]
-            current_prc = current_df["Close"]
-
-            # Open position
-            if current_df["act"] == "buy":  # 나중에 리스트 처리 해서 멀티 포지션 계산할 수 있음
-                open_buy.append(current_prc)
-            elif current_df["act"] == "sell":
-                open_sell.append(current_prc)
-
-            # Clse position
-            if current_df["act"] == "buy_clear":
-                for _ in range(len(open_buy)):
-                    ob_prc = open_buy.pop()
-                    tot_return_rate += ((current_prc - ob_prc) / ob_prc) * 100
-            elif current_df["act"] == "sell_clear":
-                for _ in range(len(open_sell)):
-                    os_prc = open_sell.pop()
-                    tot_return_rate += ((current_prc - os_prc) / os_prc) * -1 * 100
-
-            # Hold position - 여기 수정 해야 할 거 같음
-            if len(open_buy) > 0 and (idx == current_data.index[-1]):
-                for idx, ob_prc in enumerate(open_buy):
-                    tot_return_rate += ((current_prc - ob_prc) / ob_prc) * 100
-            if len(open_sell) > 0 and (idx == current_data.index[-1]):
-                for idx, os_prc in enumerate(open_sell):
-                    tot_return_rate += ((current_prc - os_prc) / os_prc) * -1 * 100
-
-        # Format return rate as percentage
-        return_rate_str = f"수익률: {tot_return_rate:.3f}% (매수포지션:{len(open_buy)}, 매도포지션:{len(open_sell)})"
-    else:
-        return_rate_str = f"수익률: {0:.3f}%"
-    return return_rate_str
-
-
 @app.callback(
     Output("return-rate", "children"), [Input("interval-component", "n_intervals")]
 )
 def update_return_rate(n):
     # Get the last row of the dataframe
     n = n % total_sample
+    n = n + env_dict["offset"] + env_dict["canves_candle_num"]
     current_data = df.iloc[:n]
 
-    return calculate_return_rate(n, current_data)
+    return calculate_return_rate_rpy(n, current_data)
 
 
 @app.callback(
@@ -167,25 +112,30 @@ def pause_resume(pause_clicks, resume_clicks):
 )
 def update_graph_live(n, y_value, x_value):
     # 캔들스틱 그래프와 이동평균선을 그립니다.
-    n = n % total_sample
+    max_lengths = df.shape[0]
 
-    prc_of_date = df[env_dict["index_name"]][:n]
-    open_prc = df["Open"][:n]
-    high_prc = df["High"][:n]
-    low_prc = df["Low"][:n]
-    close_prc = df["Close"][:n]
+    n = n % total_sample
+    n = n + env_dict["offset"] + env_dict["canves_candle_num"]
+
+    n = min(max_lengths, n)
+    s_n = n - env_dict["canves_candle_num"]
+
+    _data = df.iloc[s_n:n]
+    index_data = _data[env_dict["index_name"]]
+    prc_of_date = list(index_data.index)
+
     data = [
         go.Candlestick(
             x=prc_of_date,
-            open=open_prc,
-            high=high_prc,
-            low=low_prc,
-            close=close_prc,
+            open=_data["Open"],
+            high=_data["High"],
+            low=_data["Low"],
+            close=_data["Close"],
         ),
-        go.Scatter(x=prc_of_date, y=df["10_day_MA"][:n], mode="lines", name="10일 이동평균"),
-        go.Scatter(x=prc_of_date, y=df["50_day_MA"][:n], mode="lines", name="50일 이동평균"),
+        go.Scatter(x=prc_of_date, y=_data["10_day_MA"], mode="lines", name="10일 이동평균"),
+        go.Scatter(x=prc_of_date, y=_data["50_day_MA"], mode="lines", name="50일 이동평균"),
         go.Scatter(
-            x=prc_of_date, y=df["100_day_MA"][:n], mode="lines", name="100일 이동평균"
+            x=prc_of_date, y=_data["100_day_MA"], mode="lines", name="100일 이동평균"
         ),
     ]
 

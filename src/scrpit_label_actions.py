@@ -1,13 +1,13 @@
 import json
 import pprint
-
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
+from dash.dependencies import Input, Output, State
+
 import pandas as pd
 import plotly.graph_objs as go
 import yfinance as yf
-from dash.dependencies import Input, Output, State
+
 from joblib import load, dump
 from lib.utils import add_feature_movingmean, calculate_return_rate
 

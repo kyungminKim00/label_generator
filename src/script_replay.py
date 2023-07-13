@@ -1,13 +1,11 @@
-import yfinance as yf
-import pandas as pd
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
-from dash.dependencies import Input, Output, State
+from dash import dcc, html
+
+from dash.dependencies import Input, Output
 import plotly.graph_objs as go
 import pprint
 import json
-from joblib import load, dump
+
 import numpy as np
 from lib.utils import replay_data_load, calculate_return_rate_rpy
 

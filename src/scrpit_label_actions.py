@@ -30,6 +30,7 @@ data = yf.download(
 data.index.name = env_dict["index_name"]
 g_action_profits = 0.0
 
+
 # 이동평균을 계산합니다.
 data = add_feature_movingmean(data, ma=[10, 50, 100])
 

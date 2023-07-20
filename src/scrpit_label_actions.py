@@ -20,6 +20,12 @@ pprint.pprint(env_dict)
 if env_dict["interval"] == "15m":
     env_dict["period"] = "60d"  # 60일 15min max period
     f_strftime = "%Y-%m-%d %H:%M:%S"
+elif env_dict["interval"] == "5m":
+    env_dict["period"] = "60d"  # 60일 5min max period
+    f_strftime = "%Y-%m-%d %H:%M:%S"
+elif env_dict["interval"] == "1h":
+    env_dict["period"] = "730d"  # 60일 1h max period
+    f_strftime = "%Y-%m-%d %H:%M:%S"
 else:
     f_strftime = "%Y-%m-%d"
 data = yf.download(
